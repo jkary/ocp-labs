@@ -3,7 +3,7 @@ apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: acm
-rendezvousIP: 192.168.125.61
+rendezvousIP: 172.16.252.100
 hosts:
   - hostname: acm-node-1
     interfaces:

@@ -6,3 +6,9 @@ ocp_hcp_lab_name: "{{ lab_name }}"
 ocp_hcp_path: "{{ lab_configs | default('/tmp') }}"
 ocp_hcp_pullsecret: "{{ ocp_pullsecret_b64 }}"
 ocp_hcp_ssh_key: "{{ ocp_ssh_key }}"
+ocp_hcp_setup_config: false
+ocp_hcp_setup_ingress: false
+lab_path: '/root/labs'
+lab_install: true
+spoke_name: ''
+spoke_lb_ips: []

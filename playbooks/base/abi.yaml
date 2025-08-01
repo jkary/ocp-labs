@@ -10,6 +10,7 @@
 
   gather_facts: false
 
+  ## ACM deploy overrides these vars
   vars:
     lab_abi: True
     lab_abi_ip: "{{ lab_node_network_base }}31"

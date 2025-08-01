@@ -1,6 +1,7 @@
 ---
 lab_abi: False
 lab_api_ips: ['192.168.125.10']
+
 lab_appliance: False
 lab_appliance_arch: 'x86_64'
 lab_appliance_channel: 'stable'
@@ -10,8 +11,10 @@ lab_appliance_local_registry: false
 lab_appliance_manifests: []
 lab_appliance_operators: []
 lab_appliance_version: '4.18.4'
+
 lab_bootstrap_ip: ''
 lab_bootstrap_mac: ''
+
 lab_custom_capabilities: []
 lab_custom_capability_set: ''
 lab_custom_manifests: []
@@ -23,6 +26,7 @@ lab_fips: False
 lab_master_replicas: 3
 lab_network_name: 'lab-network'
 lab_network_type: 'OVNKubernetes'
+
 lab_node_cpus: 12
 lab_node_dhcp: true
 lab_node_dhcp6: false
@@ -34,6 +38,7 @@ lab_node_ipv6: false
 lab_node_memory: 24000
 lab_node_network: "{{ lab_node_network_base }}0/24"
 lab_node_role: 'master'
+
 lab_ntp_sources: []
 lab_mac_base: '52:54:00:ff:ff:'
 lab_cluster_network: '10.132.0.0/14'
@@ -49,4 +54,7 @@ lab_proxy_exceptions:
 lab_proxy_http: ''
 lab_worker_replicas: 0
 lab_hosts: []
+lab_cleanup: False
+dnsmasq_confd: '/etc/dnsmasq.d'
+libvirt_image_dir: '/home/libvirt-ocp'
 ...

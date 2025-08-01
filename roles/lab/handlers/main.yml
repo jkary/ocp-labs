@@ -1,2 +1,9 @@
 ---
-...
+- name: 'Restart dnsmasq service'
+  ansible.builtin.service:
+    name: 'dnsmasq'
+    state: 'restarted'
+
+- name: 'Remove virtual machines'
+  ansible.builtin.command:
+    cmd: "kcli delete plan {{ lab_name }} -y"

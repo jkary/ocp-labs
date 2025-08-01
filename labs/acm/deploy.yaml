@@ -1,50 +1,63 @@
 ---
 # Run it with:
 #   ap labs/acm/deploy.yaml
+- hosts:
+    - lab
+  roles:
+    - role: "lab"
+      vars:
+        lab_node_network_base: "172.16.252."
+        lab_abi: True
+        lab_abi_ip: "{{ lab_node_network_base }}61"
+        lab_api_ips: ["{{ lab_node_network_base }}100"]
+        lab_bootstrap_ip: "{{ lab_node_network_base }}254"
+        lab_bootstrap_mac: "{{ lab_mac_base }}00"
+        lab_node_memory: 28000
+        lab_ingress_ips: ["{{ lab_node_network_base }}101"]
+        lab_name: "acm"
+        lab_mac_base: "de:ad:be:ef:03:"
+        lab_worker_replicas: 0
+        lab_node_disk_data: 60
+        lab_node_network: "{{ lab_node_network_base }}0/24"
+        lab_node_role: "node"
+        libvirt_image_dir: "/home/libvirt-ocp"
+        install_extra_manifests: []
+        lab_hosts:
+          - { "id": "61", "role": "master" }
+          - { "id": "62", "role": "master" }
+          - { "id": "63", "role": "master" }
+        start_install: true
 
-- name: 'Clean acm lab'
-  ansible.builtin.import_playbook: ../../playbooks/jobs/clean-lab.yml
-  vars:
-    lab_name: 'acm'
-    lab_network_name: 'lab-network'
-    lab_mac_base: 'de:ad:be:ef:03:'
+- name: "Clean acm lab"
+  hosts:
+    - lab
+  roles:
+    - role: "lab"
+      vars:
+        lab_name: "acm"
+        lab_cleanup: True
   tags:
-    - 'clean'
-    - 'never'
+    - "clean"
+    - "never"
 
-- name: 'Import ABI playbook'
-  ansible.builtin.import_playbook: ../../playbooks/base/abi.yaml
+
+- name: "Setup ACM"
+  hosts:
+    - lab
+  environment:
+    KUBECONFIG: "/root/labs/{{ lab_name }}/deploy/auth/kubeconfig"
+  roles:
+    - role: "ocp_assisted_service"
+      vars:
+        lab_name: "acm"
+        lab_configs: "/root/labs/{{ lab_name }}/config"
+        ocp_assisted_service_op: 'acm'
+        ocp_assisted_service_infraenvs:
+          - name: "spoke"
+            ns: "hive-sno"
+            ntp: ["{{ lab_node_network_base }}1"]
+            redfish: "{{ lab_node_network_base }}1"
+            inventory:
+              - { name: "{{ lab_name }}-bmh-1", id: "64" }
   tags:
-    - 'ocp'
-  vars:
-    lab_name: 'acm'
-    lab_mac_base: 'de:ad:be:ef:03:'
-    lab_abi_ip: "{{ lab_node_network_base }}61"
-    lab_api_ips: ["{{ lab_node_network_base }}100"]
-    lab_ingress_ips: ["{{ lab_node_network_base }}101"]
-    lab_node_memory: 28000
-    lab_node_disk_data: 60
-    lab_hosts:
-      - {id: '61', role: 'master'}
-      - {id: '62', role: 'master'}
-      - {id: '63', role: 'master'}
-    ocp_pullsecret_b64: "{{ lab_pull_secret | b64encode }}"
-    start_install: true
-
-- name: 'Import ACM setup playbook'
-  ansible.builtin.import_playbook: ../../playbooks/setup/acm.yaml
-  tags:
-    - 'postinst'
-  vars:
-    lab_name: 'acm'
-    lab_mac_base: 'de:ad:be:ef:03:'
-    lab_network_name: 'lab-network'
-    ocp_pullsecret_b64: "{{ lab_pull_secret | b64encode }}"
-
-    ocp_assisted_service_infraenvs:
-      - name: 'spoke'
-        ns: 'hive-sno'
-        ntp: ["{{ lab_node_network_base }}1"]
-        redfish: "{{ lab_node_network_base }}1"
-        inventory:
-          - {name: "{{ lab_name }}-bmh-1", id: '64'}
+    - "postinst"

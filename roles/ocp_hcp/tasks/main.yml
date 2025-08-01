@@ -3,3 +3,13 @@
   ansible.builtin.include_tasks:
     file: 'cluster.yml'
   loop: "{{ ocp_hcp_clusters }}"
+
+- name: 'Extract hosted cluster configuration'
+  ansible.builtin.include_tasks:
+    file: 'extract_config.yml'
+  when: ocp_hcp_setup_config | default(false)
+
+- name: 'Setup hosted cluster ingress'
+  ansible.builtin.include_tasks:
+    file: 'setup_ingress.yml'
+  when: ocp_hcp_setup_ingress | default(false)

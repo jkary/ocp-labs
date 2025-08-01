@@ -3,9 +3,13 @@
 #   ap labs/hcp/deploy.yaml
 
 - name: 'Clean hcp lab'
-  ansible.builtin.import_playbook: ../../playbooks/jobs/clean-lab.yml
-  vars:
-    lab_name: 'hcp'
+  hosts:
+    - lab
+  roles:
+    - role: 'lab'
+      vars:
+        lab_name: 'hcp'
+        lab_cleanup: True
   tags:
     - 'clean'
     - 'never'
@@ -81,24 +85,38 @@
     - role: 'ocp_hcp'
       tags: ['postinst']
 
-- name: 'Prepare spoke cluster configuration'
-  ansible.builtin.import_playbook: ../../playbooks/jobs/hcp/create-config.yml
-  vars:
-    lab_name: 'hcp'
-    lab_path: '/root/labs'
-    spoke_name: 'spoke'
+- name: 'Extract spoke cluster configuration'
+  hosts:
+    - lab
+  environment:
+    KUBECONFIG: "/root/labs/{{ lab_name }}/deploy/auth/kubeconfig"
+  roles:
+    - role: 'ocp_hcp'
+      vars:
+        lab_name: 'hcp'
+        lab_path: '/root/labs'
+        spoke_name: 'spoke'
+        ocp_hcp_setup_config: true
+        ocp_hcp_setup_ingress: false
   tags:
     - 'postinst'
     - 'spoke'
 
-- name: 'Install MetalLB on spoke cluster'
-  ansible.builtin.import_playbook: ../../playbooks/jobs/hcp/create-ingress.yml
-  vars:
-    lab_name: 'hcp'
-    lab_path: '/root/labs'
-    lab_node_network_base: '192.168.125.'
-    spoke_name: 'spoke'
-    spoke_lb_ips: ["{{ lab_node_network_base }}103/32"]
+- name: 'Setup spoke cluster ingress'
+  hosts:
+    - lab
+  environment:
+    KUBECONFIG: "/root/labs/hcp/spoke/auth/kubeconfig"
+  roles:
+    - role: 'ocp_hcp'
+      vars:
+        lab_name: 'hcp'
+        lab_path: '/root/labs'
+        lab_node_network_base: '192.168.125.'
+        spoke_name: 'spoke'
+        spoke_lb_ips: ["{{ lab_node_network_base }}103/32"]
+        ocp_hcp_setup_config: false
+        ocp_hcp_setup_ingress: true
   tags:
     - 'postinst'
     - 'spoke'

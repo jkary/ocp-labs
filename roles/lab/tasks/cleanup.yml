@@ -1,0 +1,58 @@
+---
+- name: 'Test lab_name'
+  ansible.builtin.fail:
+    msg: 'Variable lab_name is empty'
+  when: lab_name | length == 0
+
+- name: 'Prepare dnsmasq fileglob pattern'
+  ansible.builtin.find:
+    path: "{{ dnsmasq_confd }}/"
+    patterns: "^{{ lab_name }}.*\\.conf$"
+    use_regex: true
+  register: clean_dnsmasq_files
+
+- name: 'Remove dnsmasq snippets'
+  notify: 'Restart dnsmasq service'
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: 'absent'
+  loop: "{{ clean_dnsmasq_files.files | map(attribute='path') }}"
+
+- name: 'Remove lab files'
+  ansible.builtin.file:
+    path: "{{ lab_path }}/{{ lab_name }}"
+    state: 'absent'
+
+- name: 'Remove agent ISO image'
+  ansible.builtin.file:
+    path: "{{ libvirt_image_dir }}/{{ lab_name }}-agent-installer.iso"
+    state: 'absent'
+
+- name: 'Remove agent ISO image (appliance)'
+  ansible.builtin.file:
+    path: "{{ libvirt_image_dir }}/{{ lab_name }}-agentconfig.iso"
+    state: 'absent'
+  when: lab_appliance
+
+- name: 'Prepare appliance-disks fileglob pattern'
+  ansible.builtin.find:
+    path: "{{ libvirt_image_dir }}/"
+    patterns: "^{{ lab_name }}-.*\\.(raw|qcow2)$"
+    use_regex: true
+  register: clean_appliance_disks
+  when: lab_appliance
+
+- name: 'Remove appliance disk images'
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: 'absent'
+  loop: "{{ clean_appliance_disks.files | map(attribute='path') }}"
+  when: lab_appliance
+
+- name: 'Search kcli plan'
+  ansible.builtin.shell:
+    cmd: "kcli list plan -o name | grep -qE \"^\\['{{ lab_name }}',\""
+  register: __kcli_plan
+  changed_when: __kcli_plan.rc == 0
+  failed_when: false
+  notify: 'Remove virtual machines'

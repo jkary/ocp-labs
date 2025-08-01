@@ -24,6 +24,7 @@ echo "Running ${CONTAINER_NAME} ..."
 podman run --rm -it \
   --security-opt label=disable \
   --name "${CONTAINER_NAME}" \
+  --network host \
   -h "${CONTAINER_NAME}" \
   -v "${PWD}:/ansible:Z" \
   -v "$SSH_AUTH_SOCK:/ssh-agent" \
@@ -33,5 +34,5 @@ podman run --rm -it \
   -v "${PWD}/.user/vars.yml:/ansible/inventory/group_vars/all/user.yml" \
   --env SSH_AUTH_SOCK=/ssh-agent \
   --env ANSIBLE_SSH_ARGS="${ANSIBLE_SSH_ARGS}" \
-  --dns 10.45.248.15 \
+  --dns 1.1.1.1 \
   "${CONTAINER_NAME}"

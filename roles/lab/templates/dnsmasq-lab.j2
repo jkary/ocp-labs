@@ -1,4 +1,8 @@
 {{ ansible_managed | comment }}
+domain={{ lab_domain }}
+bind-interfaces
+interface=lab-network
+dhcp-range=172.16.252.110,172.16.252.200,12h
 
 # {{ lab_name }} lab
 host-record=api-int.{{ lab_name }}.{{ lab_domain }},{{ lab_api_ips[0] }}
