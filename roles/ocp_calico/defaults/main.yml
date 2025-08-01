@@ -1,0 +1,2 @@
+---
+ocp_calico_path: "{{ lab_path }}/{{ lab_name }}"

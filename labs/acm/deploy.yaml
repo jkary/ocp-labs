@@ -6,6 +6,8 @@
   ansible.builtin.import_playbook: ../../playbooks/jobs/clean-lab.yml
   vars:
     lab_name: 'acm'
+    lab_network_name: 'lab-network'
+    lab_mac_base: 'de:ad:be:ef:03:'
   tags:
     - 'clean'
     - 'never'
@@ -16,6 +18,7 @@
     - 'ocp'
   vars:
     lab_name: 'acm'
+    lab_mac_base: 'de:ad:be:ef:03:'
     lab_abi_ip: "{{ lab_node_network_base }}61"
     lab_api_ips: ["{{ lab_node_network_base }}100"]
     lab_ingress_ips: ["{{ lab_node_network_base }}101"]
@@ -25,6 +28,7 @@
       - {id: '61', role: 'master'}
       - {id: '62', role: 'master'}
       - {id: '63', role: 'master'}
+    ocp_pullsecret_b64: "{{ lab_pull_secret | b64encode }}"
     start_install: true
 
 - name: 'Import ACM setup playbook'
@@ -33,6 +37,9 @@
     - 'postinst'
   vars:
     lab_name: 'acm'
+    lab_mac_base: 'de:ad:be:ef:03:'
+    lab_network_name: 'lab-network'
+    ocp_pullsecret_b64: "{{ lab_pull_secret | b64encode }}"
 
     ocp_assisted_service_infraenvs:
       - name: 'spoke'

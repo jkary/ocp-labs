@@ -10,28 +10,45 @@
     - 'clean'
     - 'never'
 
-- name: 'Import ABI playbook'
-  ansible.builtin.import_playbook: ../../playbooks/base/abi.yaml
-  tags:
-    - 'ocp'
+- name: 'HCP Openshift cluster'
+  hosts:
+    - 'lab'
+
+  gather_facts: false
+
   vars:
-    lab_name: 'hcp'
+    lab_abi: True
     lab_abi_ip: "{{ lab_node_network_base }}61"
     lab_api_ips: ["{{ lab_node_network_base }}100"]
+    lab_bootstrap_ip: "{{ lab_node_network_base }}254"
+    lab_bootstrap_mac: "{{ lab_mac_base }}00"
     lab_ingress_ips: ["{{ lab_node_network_base }}101"]
-    lab_node_memory: 28000
-    lab_node_disk_data: 60
-    lab_hosts:
-      - {id: '61', role: 'master'}
-      - {id: '62', role: 'master'}
-      - {id: '63', role: 'master'}
-    start_install: true
-
-- name: 'Import hcp-compact setup playbook'
-  ansible.builtin.import_playbook: ../../playbooks/setup/hcp.yaml
-  vars:
     lab_name: 'hcp'
-    lab_mac_base: 'be:be:ca:fe:02:'
+    lab_mac_base: 'de:ad:be:ef:03:'
+    lab_worker_replicas: 0
+    lab_node_disk_data: 60
+    lab_node_memory: 28000
+    lab_node_network: "{{ lab_node_network_base }}0/24"
+    lab_node_network_base: '192.168.125.'
+    lab_node_role: 'master'
+    libvirt_image_dir: '/home/libvirt-ocp'
+    install_extra_manifests: []
+    lab_hosts:
+      - {'id': '61', 'role': 'master'}
+      - {'id': '62', 'role': 'master'}
+      - {'id': '63', 'role': 'master'}
+    
+    # OpenShift installation variables
+    ocp_assisted_service_pullsecret: "{{ lab_pull_secret }}"
+    ocp_pullsecret_b64: "{{ lab_pull_secret | b64encode }}"
+    start_install: true
+    
+    # HCP specific variables
+    lab_configs: "/root/labs/{{ lab_name }}/config"
+    lab_network_name: 'lab-network'
+    lab_install: true
+    lab_node_disk_pool: 'ocp'
+    
     ocp_hcp_kubeapi_ips: ["{{ lab_node_network_base }}102/32"]
     ocp_assisted_service_infraenvs:
       - name: 'hosted'
@@ -51,8 +68,18 @@
         domain: 'local.lab'
         lb: "{{ lab_node_network_base }}103"
         replicas: 1
-  tags:
-    - 'postinst'
+
+  environment:
+    PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin'
+    KUBECONFIG: "/root/labs/{{ lab_name }}/deploy/auth/kubeconfig"
+
+  roles:
+    - role: 'lab'
+      tags: ['ocp']
+    - role: 'ocp_abi'
+      tags: ['ocp']
+    - role: 'ocp_hcp'
+      tags: ['postinst']
 
 - name: 'Prepare spoke cluster configuration'
   ansible.builtin.import_playbook: ../../playbooks/jobs/hcp/create-config.yml
