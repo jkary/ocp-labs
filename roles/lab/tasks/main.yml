@@ -3,183 +3,197 @@
   ansible.builtin.include_tasks: cleanup.yml
   when: lab_cleanup | default(False)
 
-- name: "Create labs root directory"
-  ansible.builtin.file:
-    path: "{{ lab_path }}"
-    mode: "0755"
-    state: "directory"
-
-- name: "Create lab directory tree"
-  ansible.builtin.file:
-    path: "{{ lab_path }}/{{ item }}"
-    mode: "0750"
-    state: "directory"
-  ignore_errors: "{{ ansible_check_mode }}"
-  loop:
-    - "{{ lab_name }}"
-    - "{{ lab_name }}/config"
-    - "{{ lab_name }}/deploy"
-
-- name: "Include appliance tasks"
-  ansible.builtin.include_tasks: appliance.yaml
-  when: lab_appliance
-
-- name: "What is our rendevousIP"
-  debug:
-    msg:
-      lab_abi_ip: "{{lab_abi_ip}}"
-      a: "{{lab_node_network_base}}"
-
-- name: "Create install-config.yaml file"
-  ansible.builtin.template:
-    src: "install-config.yaml.j2"
-    dest: "{{ lab_path }}/{{ lab_name }}/config/install-config.yaml"
-    mode: "0644"
-  ignore_errors: "{{ ansible_check_mode }}"
-
-- name: "Create agent-config.yaml file"
-  ansible.builtin.template:
-    src: "agent-config.yaml.j2"
-    dest: "{{ lab_path }}/{{ lab_name }}/config/agent-config.yaml"
-    mode: "0644"
-  ignore_errors: "{{ ansible_check_mode }}"
-  when: lab_abi
-
-- name: "Create dnsmasq snippet"
-  ansible.builtin.include_role:
-    name: "dnsmasq"
-    tasks_from: "extra_conf.yaml"
-  vars:
-    dnsmasq_conf_snippets:
-      - { src: "dnsmasq-lab.j2", dest: "{{ lab_name }}.conf" }
-  tags: ["dnsmasq"]
-
-- name: "Prepare VMs disks"
-  ansible.builtin.set_fact:
-    __lab_vm_disks:
-      - {
-          "size": "{{ lab_node_disk_sys }}",
-          "pool": "{{ lab_node_disk_pool }}",
-        }
-      - {
-          "size": "{{ item.disk_data | default(lab_node_disk_data) }}",
-          "pool": "{{ lab_node_disk_pool }}",
-        }
-  when: not lab_appliance
-
-- name: "Create virtual machines"
-  karmab.kcli.kcli_vm:
-    name: "{{ lab_name }}-{{ item.role | default(lab_node_role) }}-{{ ansible_loop.index }}"
-    state: "present"
-    parameters:
-      start: false
-      uefi_legacy: true
-      plan: "{{ lab_name }}"
-      memory: "{{ item.memory | default(lab_node_memory) }}"
-      numcpus: "{{ item.cpus | default(lab_node_cpus) }}"
-      disks: "{{ __lab_vm_disks }}"
-      nets:
-        - {
-            "name": "{{ lab_network_name }}",
-            "mac": "{{ item.mac | default('{}{}'.format(lab_mac_base, item.id)) }}",
-          }
-  loop: "{{ lab_hosts }}"
-  loop_control:
-    extended: true
-
-# Moved from base/abi.yaml
-# TODO: refactor entire file. 
-- name: 'Execute base handlers'
-  ansible.builtin.meta: flush_handlers
-
-- name: 'Copy configuration files to deploy directory'
-  ansible.builtin.copy:
-    src: "{{ lab_path }}/{{ lab_name }}/config/{{ item }}"
-    dest: "{{ lab_path }}/{{ lab_name }}/deploy/{{ item }}"
-    mode: '0640'
-    remote_src: true
-  loop:
-    - 'install-config.yaml'
-    - 'agent-config.yaml'
-
-- name: 'Generate cluster manifests'
-  ansible.builtin.command:
-    cmd: >
-      openshift-install agent create cluster-manifests
-      --dir {{ lab_path }}/{{ lab_name }}/deploy
-    creates: "{{ lab_path }}/{{ lab_name }}/deploy/.openshift_install_state.json"
-
-- name: 'Include calico tasks'
-  ansible.builtin.include_tasks:
-    file: '../setup/calico.yaml'
-  when: calico_version is defined
-
-- name: 'Add extra manifests'
+- name: "Setup lab infrastructure"
   block:
-    - name: 'Create openshift manifests directory'
+    - name: "Ensure libvirt network exists"
+      ansible.builtin.include_tasks: network.yml
+
+    - name: "Create labs root directory"
       ansible.builtin.file:
-        path: "{{ lab_path }}/{{ lab_name }}/deploy/openshift"
-        state: 'directory'
-    - name: 'Copy custom manifests'
+        path: "{{ lab_path }}"
+        mode: "0755"
+        state: "directory"
+
+    - name: "Create lab directory tree"
+      ansible.builtin.file:
+        path: "{{ lab_path }}/{{ item }}"
+        mode: "0750"
+        state: "directory"
+      ignore_errors: "{{ ansible_check_mode }}"
+      loop:
+        - "{{ lab_name }}"
+        - "{{ lab_name }}/config"
+        - "{{ lab_name }}/deploy"
+
+    - name: "Include appliance tasks"
+      ansible.builtin.include_tasks: appliance.yaml
+      when: lab_appliance
+
+    - name: "What is our rendevousIP"
+      debug:
+        msg:
+          lab_abi_ip: "{{lab_abi_ip}}"
+          a: "{{lab_node_network_base}}"
+
+    - name: "Create install-config.yaml file"
       ansible.builtin.template:
-        src: "{{ item.src }}"
-        dest: "{{ lab_path }}/{{ lab_name }}/deploy/openshift/{{ item.dest }}"
+        src: "install-config.yaml.j2"
+        dest: "{{ lab_path }}/{{ lab_name }}/config/install-config.yaml"
+        mode: "0644"
+      ignore_errors: "{{ ansible_check_mode }}"
+
+    - name: "Create agent-config.yaml file"
+      ansible.builtin.template:
+        src: "agent-config.yaml.j2"
+        dest: "{{ lab_path }}/{{ lab_name }}/config/agent-config.yaml"
+        mode: "0644"
+      ignore_errors: "{{ ansible_check_mode }}"
+      when: lab_abi
+
+    - name: "Create dnsmasq snippet"
+      ansible.builtin.include_role:
+        name: "dnsmasq"
+        tasks_from: "extra_conf.yaml"
+      vars:
+        dnsmasq_conf_snippets:
+          - { src: "dnsmasq-lab.j2", dest: "{{ lab_name }}.conf" }
+      tags: ["dnsmasq"]
+
+    - name: "Prepare VMs disks"
+      ansible.builtin.set_fact:
+        __lab_vm_disks:
+          - {
+              "size": "{{ lab_node_disk_sys }}",
+              "pool": "{{ lab_node_disk_pool }}",
+            }
+          - {
+              "size": "{{ item.disk_data | default(lab_node_disk_data) }}",
+              "pool": "{{ lab_node_disk_pool }}",
+            }
+      when: not lab_appliance
+
+    - name: "Create virtual machines"
+      karmab.kcli.kcli_vm:
+        name: "{{ lab_name }}-{{ item.role | default(lab_node_role) }}-{{ ansible_loop.index }}"
+        state: "present"
+        parameters:
+          start: false
+          uefi_legacy: true
+          plan: "{{ lab_name }}"
+          memory: "{{ item.memory | default(lab_node_memory) }}"
+          numcpus: "{{ item.cpus | default(lab_node_cpus) }}"
+          cpumode: "{{ item.cpumode | default(lab_node_cpumode | default(omit)) }}"
+          cpuflags: "{{ item.cpuflags | default(lab_node_cpuflags | default([])) }}"
+          disks: "{{ __lab_vm_disks }}"
+          nets:
+            - {
+                "name": "{{ lab_network_name }}",
+                "mac": "{{ item.mac | default('{}{}'.format(lab_mac_base, item.id)) }}",
+              }
+      loop: "{{ lab_hosts }}"
+      loop_control:
+        extended: true
+      when: start_install==true
+
+    # Moved from base/abi.yaml
+    # TODO: refactor entire file. 
+    - name: 'Execute base handlers'
+      ansible.builtin.meta: flush_handlers
+
+    - name: 'Copy configuration files to deploy directory'
+      ansible.builtin.copy:
+        src: "{{ lab_path }}/{{ lab_name }}/config/{{ item }}"
+        dest: "{{ lab_path }}/{{ lab_name }}/deploy/{{ item }}"
         mode: '0640'
-      loop: "{{ install_extra_manifests }}"
-  when:
-    - install_extra_manifests is defined
-    - install_extra_manifests | length > 0
+        remote_src: true
+      loop:
+        - 'install-config.yaml'
+        - 'agent-config.yaml'
 
-- name: 'Generate bootstrap ISO image'
-  ansible.builtin.command:
-    cmd: >
-      openshift-install agent create image
-      --dir {{ lab_path }}/{{ lab_name }}/deploy
-    creates: "{{ lab_path }}/{{ lab_name }}/deploy/agent.x86_64.iso"
+    - name: 'Generate cluster manifests'
+      ansible.builtin.command:
+        cmd: >
+          openshift-install agent create cluster-manifests
+          --dir {{ lab_path }}/{{ lab_name }}/deploy
+        creates: "{{ lab_path }}/{{ lab_name }}/deploy/.openshift_install_state.json"
 
-- name: 'Copy ISO image to libvirt image directory'
-  ansible.builtin.copy:
-    src: "{{ lab_path }}/{{ lab_name }}/deploy/agent.x86_64.iso"
-    dest: "{{ libvirt_image_dir }}/{{ lab_name }}-agent-installer.iso"
-    remote_src: true
+    - name: 'Include calico tasks'
+      ansible.builtin.include_tasks:
+        file: '../setup/calico.yaml'
+      when: calico_version is defined
 
-- name: 'Change CD-ROM source to ABI iso image'
-  ansible.builtin.command:
-    cmd: >
-      virsh change-media --current
-      {{ lab_name }}-{{ item.role | default(lab_node_role) }}-{{ ansible_loop.index }}
-      hdc
-      {{ libvirt_image_dir }}/{{ lab_name }}-agent-installer.iso
-  loop: "{{ lab_hosts }}"
-  loop_control:
-    extended: true
+    - name: 'Add extra manifests'
+      block:
+        - name: 'Create openshift manifests directory'
+          ansible.builtin.file:
+            path: "{{ lab_path }}/{{ lab_name }}/deploy/openshift"
+            state: 'directory'
+        - name: 'Copy custom manifests'
+          ansible.builtin.template:
+            src: "{{ item.src }}"
+            dest: "{{ lab_path }}/{{ lab_name }}/deploy/openshift/{{ item.dest }}"
+            mode: '0640'
+          loop: "{{ install_extra_manifests }}"
+      when:
+        - install_extra_manifests is defined
+        - install_extra_manifests | length > 0
 
-- name: 'Start VMs'
-  ansible.builtin.command:
-    cmd: >
-      virsh start
-      {{ lab_name }}-{{ item.role | default(lab_node_role) }}-{{ ansible_loop.index }}
-  loop: "{{ lab_hosts }}"
-  loop_control:
-    extended: true
-  when: start_install | default(False)
+    - name: 'Generate bootstrap ISO image'
+      ansible.builtin.command:
+        cmd: >
+          openshift-install agent create image
+          --dir {{ lab_path }}/{{ lab_name }}/deploy
+        creates: "{{ lab_path }}/{{ lab_name }}/deploy/agent.x86_64.iso"
 
-- name: 'Wait for kubeconfig file'
-  ansible.builtin.wait_for:
-    path: "{{ lab_path }}/{{ lab_name }}/deploy/auth/kubeconfig"
-    state: 'present'
-  when: start_install | default(False)
+    - name: 'Copy ISO image to libvirt image directory'
+      ansible.builtin.copy:
+        src: "{{ lab_path }}/{{ lab_name }}/deploy/agent.x86_64.iso"
+        dest: "{{ libvirt_image_dir }}/{{ lab_name }}-agent-installer.iso"
+        remote_src: true
 
-- name: 'Waiting until the installation finishes'
-  ansible.builtin.command:
-    cmd: >
-      oc get clusterversion -o jsonpath='{.items[*].status.conditions[?(@.type=="Available")].status}'
-  register: install_status
-  environment:
-    KUBECONFIG: "{{ lab_path }}/{{ lab_name }}/deploy/auth/kubeconfig"
-    PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin'
-  retries: 125
-  delay: 30
-  until: install_status.stdout == 'True'
-  changed_when: False
-  when: start_install | default(False)
+    - name: 'Change CD-ROM source to ABI iso image'
+      ansible.builtin.command:
+        cmd: >
+          sudo virsh change-media --current
+          {{ lab_name }}-{{ item.role | default(lab_node_role) }}-{{ ansible_loop.index }}
+          hdc
+          {{ libvirt_image_dir }}/{{ lab_name }}-agent-installer.iso
+      loop: "{{ lab_hosts }}"
+      loop_control:
+        extended: true
+
+    - name: 'Start VMs'
+      ansible.builtin.command:
+        cmd: >
+          virsh start
+          {{ lab_name }}-{{ item.role | default(lab_node_role) }}-{{ ansible_loop.index }}
+      loop: "{{ lab_hosts }}"
+      loop_control:
+        extended: true
+      when: start_install==true | default(False)
+
+    - name: debug vars
+      debug:
+        msg: "{{ ocp_abi_path }}/deploy/auth/kubeconfig"
+
+    - name: 'Wait for kubeconfig file'
+      ansible.builtin.wait_for:
+        path: "{{ lab_path }}/{{ lab_name }}/deploy/auth/kubeconfig"
+        state: 'present'
+      when: start_install | default(False)
+
+    - name: 'Waiting until the installation finishes'
+      ansible.builtin.command:
+        cmd: >
+          oc get clusterversion -o jsonpath='{.items[*].status.conditions[?(@.type=="Available")].status}'
+      register: install_status
+      environment:
+        KUBECONFIG: "{{ lab_path }}/{{ lab_name }}/deploy/auth/kubeconfig"
+        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin'
+      retries: 125
+      delay: 30
+      until: install_status.stdout == 'True'
+      changed_when: False
+      when: start_install | default(False)
+
+  when: not (lab_cleanup | default(False))

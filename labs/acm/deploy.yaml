@@ -31,10 +31,11 @@
 - name: "Clean acm lab"
   hosts:
     - lab
+  vars:
+    lab_name: "acm"
   roles:
     - role: "lab"
       vars:
-        lab_name: "acm"
         lab_cleanup: True
   tags:
     - "clean"

@@ -6,6 +6,10 @@
     kind: Namespace
     state: present
 
+- name: pull-secret 
+  debug:
+    msg: "{{ocp_assisted_service_pullsecret}}"
+
 - name: 'Create pull-secret (plain)'
   kubernetes.core.k8s:
     state: present
@@ -17,8 +21,8 @@
         name: "pull-secret-{{ item.name }}"
         namespace: "{{ item.ns }}"
       stringData:
-        .dockerconfigjson: "'{{ item.pullsecret | default(ocp_assisted_service_pullsecret) }}'"
-  when: item.pullsecret | default(ocp_assisted_service_pullsecret) | regex_search('^\{')
+        .dockerconfigjson: "{{ item.pullsecret | default(ocp_assisted_service_pullsecret) | to_json }}"
+  when: item.pullsecret | default(ocp_assisted_service_pullsecret) | regex_search('^\{') | bool
 
 - name: 'Create pull-secret (base64)'
   kubernetes.core.k8s:

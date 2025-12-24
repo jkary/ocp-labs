@@ -74,6 +74,10 @@
     extended: true
   when: ocp_abi_start_install
 
+- name: debug
+  debug:
+    msg: "{{ ocp_abi_path }}/deploy/auth/kubeconfig"
+
 - name: 'Wait for kubeconfig file'
   ansible.builtin.wait_for:
     path: "{{ ocp_abi_path }}/deploy/auth/kubeconfig"

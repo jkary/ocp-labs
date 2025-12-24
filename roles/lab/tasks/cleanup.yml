@@ -12,6 +12,7 @@
   register: clean_dnsmasq_files
 
 - name: 'Remove dnsmasq snippets'
+  become: true
   notify: 'Restart dnsmasq service'
   ansible.builtin.file:
     path: "{{ item }}"

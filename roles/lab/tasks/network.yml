@@ -1,0 +1,33 @@
+---
+- name: "Check if libvirt network exists"
+  ansible.builtin.command:
+    cmd: "sudo virsh net-info {{ lab_network_name }}"
+  register: __lab_network_check
+  failed_when: false
+  changed_when: false
+
+- name: "Create libvirt network"
+  when: __lab_network_check.rc != 0
+  block:
+    - name: "Generate network XML definition"
+      ansible.builtin.template:
+        src: "network.xml.j2"
+        dest: "/tmp/{{ lab_network_name }}.xml"
+        mode: "0644"
+
+    - name: "Define libvirt network"
+      ansible.builtin.command:
+        cmd: "sudo virsh net-define /tmp/{{ lab_network_name }}.xml"
+
+    - name: "Start libvirt network"
+      ansible.builtin.command:
+        cmd: "sudo virsh net-start {{ lab_network_name }}"
+
+    - name: "Set libvirt network to autostart"
+      ansible.builtin.command:
+        cmd: "sudo virsh net-autostart {{ lab_network_name }}"
+
+    - name: "Clean up temporary network XML file"
+      ansible.builtin.file:
+        path: "/tmp/{{ lab_network_name }}.xml"
+        state: absent

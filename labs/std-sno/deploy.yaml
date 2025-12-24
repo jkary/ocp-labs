@@ -5,10 +5,11 @@
 - name: 'Clean std-sno lab'
   hosts:
     - lab
+  vars:
+    lab_name: 'std-sno'
   roles:
     - role: 'lab'
       vars:
-        lab_name: 'std-sno'
         lab_cleanup: True
   tags:
     - 'clean'
@@ -17,24 +18,45 @@
 - name: 'Setup Single Node OpenShift (SNO)'
   hosts:
     - lab
+  gather_facts: false
+
+  vars:
+    lab_name: 'std-sno'
+    lab_abi: True
+    lab_network_name: cjunos
+    lab_dns_network: 
+      - 1.1.1.1
+    lab_domain: "{{ lab_network_name }}.lab"
+    lab_node_network_base: '172.16.244.'
+    lab_abi_ip: "{{ lab_node_network_base }}31"
+    lab_api_ips: ["{{ lab_node_network_base }}31"]
+    lab_ingress_ips: ["{{ lab_node_network_base }}31"]
+    lab_mac_base: 'de:ad:ca:fe:05:'
+    lab_master_replicas: 1
+    lab_worker_replicas: 0
+    lab_node_disk_data: 1
+    lab_node_network: "{{ lab_node_network_base }}0/24"
+    lab_node_role: 'node'
+    lab_hosts:
+      - {'id': '31', 'role': 'master', 'iface': 'enp1s0'}
+    libvirt_image_dir: '/home/libvirt-ocp'
+    start_install: true
+
+    # OpenShift installation variables
+    ocp_assisted_service_pullsecret: "{{ lab_pull_secret }}"
+    ocp_pullsecret: "{{ lab_pull_secret }}"
+    ocp_pullsecret_b64: "{{ lab_pull_secret | b64encode }}"
+
+    ocp_ssh_key: >
+      ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA0+vLlJwjHXSiQiq9B5B2cVHDPa15behLc9Ly9x0X7Vw6G88A2L3zHLHAwTJ5BL1CknGfHbvRK+6eGqMr6Idvc7f2RLQ6y7MB1q+ECUL1QjUjWue0ZBZkRpRNpwZUPA67X6Yf4wCp9Cg3x4PStiIkEwERBN8pIHfN4PJHYACN9K1co+CryiFPLXMdDYnyEHtbA5JudzEOt5+P1oGjZ5UvGiVu0KoproXOvU3EpJODRMB5cJV5b4cz5aGFjMEYCK+KhtzHGUFbDuJrw62o3j1mbr9C7ZGRT7EWBdDTvi0dKeiapBzq1vyklACkEwNCmDCPz6fki3G7au3vSC1CttyaOw== jkary@dhcp-64-102-214-149.cisco.com
+      ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCbfu0XdmNzwmybuDfO4Xxl/x3ZY0xTuy8dEJfVxHz/wksSU2MSL1TvwCEQymdITmpKaDSmtyY34WajU7i2hdObJJcmAJfErnWRzpj3fbhxRCeEYpBOGAJB2exP7BCW6RohJsLs2oiZb+6qXDBLamVXt+Pvwvo2ROP4/sNIjLAdXHlciDknxyOSaZPHt2X59nFfJYhEv8d3ya9/1CpX5B1yCkrsf9QtmbuP28KGiTCFxAuj1D+uMsffPUSusSjvihLYosZbhzkSNs/qEzcyd0NsEqr5tls8/XSzXwKSg4Dea9ktniZA2vLG6ThkfF05Hs21bb50iwbMfAzwWHTp5zcpoia7VrWL/kGHrjI+f17sTidUR/Ud01zxFo8lZEb2OprDf3sJTiLkzESyDYxB12WqIgKdQZGj7fvHoUmSIrc3NexliMwP812NpBwo6QXGWhSAb2QBt8xXFP9XtBOOKyMHyqjjuPD67fmiE6FGB0uSbtRUzisU+UjsjCnZ+E8vz48= jkary@jkary98-alps
+
   environment:
     PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin'
+    KUBECONFIG: "/home/jkary/labs/{{ lab_name }}/deploy/auth/kubeconfig"
+
   roles:
     - role: 'lab'
-      vars:
-        lab_abi: True
-        lab_abi_ip: "{{ lab_node_network_base }}31"
-        lab_api_ips: ["{{ lab_node_network_base }}31"]
-        lab_ingress_ips: ["{{ lab_node_network_base }}31"]
-        lab_name: 'std-sno'
-        lab_master_replicas: 1
-        lab_mac_base: 'be:be:ca:fe:05:'
-        lab_node_disk_data: 1
-        lab_node_network_base: '192.168.125.'
-        lab_node_role: 'node'
-        lab_hosts:
-          - {'id': '31', 'iface': 'enp1s0'}
-        libvirt_image_dir: '/home/libvirt-ocp'
-        start_install: true
-  tags:
-    - 'ocp'
+      tags: ['ocp']
+    - role: 'ocp_abi'
+      tags: ['ocp']

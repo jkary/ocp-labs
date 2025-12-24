@@ -26,6 +26,8 @@ lab_fips: False
 lab_master_replicas: 3
 lab_network_name: 'lab-network'
 lab_network_type: 'OVNKubernetes'
+lab_network_gateway: "{{ lab_node_network_base }}1"
+lab_network_prefix: 24
 
 lab_node_cpus: 12
 lab_node_dhcp: true
