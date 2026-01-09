@@ -1,33 +1,64 @@
 ---
-# - name: 'Validate CatalogSource'
-#   kubernetes.core.k8s_info:
-#     api_version: 'operators.coreos.com/v1alpha1'
-#     kind: 'CatalogSource'
-#   register: __olm_catalog_status
-#   until: >
-#     __olm_catalog_status.resources |
-#     selectattr('metadata.namespace', 'equalto', item.source_ns | default('openshift-marketplace')) |
-#     selectattr('metadata.name', 'equalto', item.source) |
-#     length > 0
-#   retries: 10
-#   delay: 30
-#   when:
-#     - ocp_olm_apply
-#     - not ansible_check_mode
-#     - ocp_olm_check_sources
+- name: 'Check if operator is already installed'
+  kubernetes.core.k8s_info:
+    api_version: 'operators.coreos.com/v1alpha1'
+    kind: 'Subscription'
+    name: "{{ item.subscription_name | default(item.operator_name) }}"
+    namespace: "{{ item.ns }}"
+  register: __olm_existing_subscription
+
+- name: 'Check if operator pods are running'
+  kubernetes.core.k8s_info:
+    api_version: 'v1'
+    kind: 'Pod'
+    namespace: "{{ item.ns }}"
+    label_selectors:
+      - "app.kubernetes.io/name={{ item.operator_name }}"
+  register: __olm_existing_pods
+
+- name: 'Set skip installation flag'
+  set_fact:
+    __olm_skip_install: >-
+      {{ (__olm_existing_pods.resources | length > 0) and
+         (__olm_existing_pods.resources | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Running') | list | length > 0) }}
+
+- name: 'Display installation skip status'
+  debug:
+    msg: "{{ item.operator_name }} operator is already installed and running. Skipping installation."
+  when: __olm_skip_install | default(false)
+
+- name: 'Validate CatalogSource'
+  kubernetes.core.k8s_info:
+    api_version: 'operators.coreos.com/v1alpha1'
+    kind: 'CatalogSource'
+  register: __olm_catalog_status
+  until: >
+    __olm_catalog_status.resources |
+    selectattr('metadata.namespace', 'equalto', item.source_ns | default('openshift-marketplace')) |
+    selectattr('metadata.name', 'equalto', item.source) |
+    length > 0
+  retries: 10
+  delay: 30
+  when:
+    - ocp_olm_apply
+    - not ansible_check_mode
+    - ocp_olm_check_sources
 
 - name: 'Create subscription manifest'
   ansible.builtin.template:
     src: 'v0.yaml.j2'
     dest: "{{ ocp_olm_path }}/{{ item.subscription_name | default(item.operator_name) }}-subscription.yaml"
     mode: '0644'
-
+    follow: true
+  become: false
+  # when: not (__olm_skip_install | default(false))
+    
 - name: 'Install subscription manifest'
   kubernetes.core.k8s:
     state: 'present'
     src: "{{ ocp_olm_path }}/{{ item.subscription_name | default(item.operator_name) }}-subscription.yaml"
   ignore_errors: "{{ ansible_check_mode }}"
-  when: ocp_olm_apply
+  when: ocp_olm_apply and not (__olm_skip_install | default(false))
 
 - name: 'Waiting until the operator is installed'
   kubernetes.core.k8s_info:
@@ -40,6 +71,6 @@
     - __olm_subscription_status.resources | length > 0
     - __olm_subscription_status.resources[0].status.state is defined
     - __olm_subscription_status.resources[0].status.state == 'AtLatestKnown'
-  retries: 10
-  delay: 30
-  when: ocp_olm_apply and not ansible_check_mode
+  retries: 15
+  delay: 45
+  when: ocp_olm_apply and not ansible_check_mode and not (__olm_skip_install | default(false))

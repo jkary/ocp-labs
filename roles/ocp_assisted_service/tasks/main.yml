@@ -4,6 +4,7 @@
     src: 'config.yaml.j2'
     dest: "{{ ocp_assisted_service_path }}/agent-service-config.yaml"
     mode: '0640'
+  become: false
   ignore_errors: "{{ ansible_check_mode }}"
 
 - name: 'Waiting for agentserviceconfigs CRD'

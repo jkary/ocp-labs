@@ -13,12 +13,14 @@
         path: "{{ lab_path }}"
         mode: "0755"
         state: "directory"
+      become: false
 
     - name: "Create lab directory tree"
       ansible.builtin.file:
         path: "{{ lab_path }}/{{ item }}"
         mode: "0750"
         state: "directory"
+      become: false
       ignore_errors: "{{ ansible_check_mode }}"
       loop:
         - "{{ lab_name }}"
@@ -40,6 +42,7 @@
         src: "install-config.yaml.j2"
         dest: "{{ lab_path }}/{{ lab_name }}/config/install-config.yaml"
         mode: "0644"
+      become: false
       ignore_errors: "{{ ansible_check_mode }}"
 
     - name: "Create agent-config.yaml file"
@@ -47,6 +50,7 @@
         src: "agent-config.yaml.j2"
         dest: "{{ lab_path }}/{{ lab_name }}/config/agent-config.yaml"
         mode: "0644"
+      become: false
       ignore_errors: "{{ ansible_check_mode }}"
       when: lab_abi
 
@@ -93,7 +97,6 @@
       loop: "{{ lab_hosts }}"
       loop_control:
         extended: true
-      when: start_install==true
 
     # Moved from base/abi.yaml
     # TODO: refactor entire file. 
@@ -106,6 +109,7 @@
         dest: "{{ lab_path }}/{{ lab_name }}/deploy/{{ item }}"
         mode: '0640'
         remote_src: true
+      become: false
       loop:
         - 'install-config.yaml'
         - 'agent-config.yaml'
@@ -116,6 +120,7 @@
           openshift-install agent create cluster-manifests
           --dir {{ lab_path }}/{{ lab_name }}/deploy
         creates: "{{ lab_path }}/{{ lab_name }}/deploy/.openshift_install_state.json"
+      become: false
 
     - name: 'Include calico tasks'
       ansible.builtin.include_tasks:
@@ -128,11 +133,13 @@
           ansible.builtin.file:
             path: "{{ lab_path }}/{{ lab_name }}/deploy/openshift"
             state: 'directory'
+          become: false
         - name: 'Copy custom manifests'
           ansible.builtin.template:
             src: "{{ item.src }}"
             dest: "{{ lab_path }}/{{ lab_name }}/deploy/openshift/{{ item.dest }}"
             mode: '0640'
+          become: false
           loop: "{{ install_extra_manifests }}"
       when:
         - install_extra_manifests is defined
@@ -144,6 +151,7 @@
           openshift-install agent create image
           --dir {{ lab_path }}/{{ lab_name }}/deploy
         creates: "{{ lab_path }}/{{ lab_name }}/deploy/agent.x86_64.iso"
+      become: false
 
     - name: 'Copy ISO image to libvirt image directory'
       ansible.builtin.copy:
@@ -170,7 +178,11 @@
       loop: "{{ lab_hosts }}"
       loop_control:
         extended: true
-      when: start_install==true | default(False)
+      register: vm_start
+      changed_when: vm_start.rc == 0
+      failed_when:
+        - vm_start.rc != 0
+        - "'Domain is already active' not in vm_start.stderr"
 
     - name: debug vars
       debug:
@@ -180,7 +192,6 @@
       ansible.builtin.wait_for:
         path: "{{ lab_path }}/{{ lab_name }}/deploy/auth/kubeconfig"
         state: 'present'
-      when: start_install | default(False)
 
     - name: 'Waiting until the installation finishes'
       ansible.builtin.command:
@@ -194,6 +205,5 @@
       delay: 30
       until: install_status.stdout == 'True'
       changed_when: False
-      when: start_install | default(False)
 
   when: not (lab_cleanup | default(False))

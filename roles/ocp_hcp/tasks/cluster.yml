@@ -45,6 +45,7 @@
     src: 'cluster.yaml.j2'
     dest: "{{ ocp_hcp_path }}/hcp-{{ item.name }}.yaml"
     mode: '0644'
+  become: false
 
 - name: 'Apply HostedCluster manifest'
   kubernetes.core.k8s:

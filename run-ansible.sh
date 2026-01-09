@@ -32,6 +32,7 @@ podman run --rm -it \
   -v ~/.gnupg:/root/.gnupg \
   -v "${PWD}/.user/history:/root/.bash_history_ansible" \
   -v "${PWD}/.user/vars.yml:/ansible/inventory/group_vars/all/user.yml" \
+  -v "/home/jkary/labs:/root/labs:Z" \
   --env SSH_AUTH_SOCK=/ssh-agent \
   --env ANSIBLE_SSH_ARGS="${ANSIBLE_SSH_ARGS}" \
   --dns 1.1.1.1 \
