@@ -12,7 +12,7 @@
 - name: 'Clean hcp-compact lab'
   ansible.builtin.import_playbook: ../../playbooks/jobs/clean-lab.yml
   vars:
-    lab_name: 'hcp'
+    lab_name: 'hcp-compact'
   tags:
     - 'clean'
     - 'never'
@@ -20,7 +20,7 @@
 - name: 'Import compact playbook'
   ansible.builtin.import_playbook: ../../playbooks/base/compact.yml
   vars:
-    lab_name: 'hcp'
+    lab_name: 'hcp-compact'
     lab_node_memory: 32000
     lab_node_disk_data: 60
     start_install: true
@@ -32,7 +32,7 @@
     - 'lab'
   gather_facts: false
   vars:
-    lab_name: 'hcp'
+    lab_name: 'hcp-compact'
   environment:
     KUBECONFIG: "/root/labs/{{ lab_name }}/deploy/auth/kubeconfig"
   pre_tasks:
@@ -103,7 +103,7 @@
 - name: 'Prepare cluster "hcp1" configuration'
   ansible.builtin.import_playbook: ../../playbooks/jobs/hcp/create-config.yml
   vars:
-    lab_name: 'hcp'
+    lab_name: 'hcp-compact'
     lab_path: '/root/labs'
     spoke_name: 'hcp1'
   tags:
@@ -113,7 +113,7 @@
 - name: 'Prepare cluster "hcp2" configuration'
   ansible.builtin.import_playbook: ../../playbooks/jobs/hcp/create-config.yml
   vars:
-    lab_name: 'hcp'
+    lab_name: 'hcp-compact'
     lab_path: '/root/labs'
     spoke_name: 'hcp2'
   tags:
@@ -123,7 +123,7 @@
 - name: 'Install MetalLB on spoke cluster hcp1'
   ansible.builtin.import_playbook: ../../playbooks/jobs/hcp/create-ingress.yml
   vars:
-    lab_name: 'hcp'
+    lab_name: 'hcp-compact'
     lab_path: '/root/labs'
     lab_node_network_base: '192.168.125'
     spoke_name: 'hcp1'
@@ -135,7 +135,7 @@
 - name: 'Install MetalLB on spoke cluster hcp2'
   ansible.builtin.import_playbook: ../../playbooks/jobs/hcp/create-ingress.yml
   vars:
-    lab_name: 'hcp'
+    lab_name: 'hcp-compact'
     lab_path: '/root/labs'
     lab_node_network_base: '192.168.125'
     spoke_name: 'hcp2'
