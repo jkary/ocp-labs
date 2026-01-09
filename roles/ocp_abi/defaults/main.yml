@@ -2,6 +2,5 @@
 ocp_abi_apply: "{{ ocp_apply | default(true) }}"
 ocp_abi_ip: "{{ lab_node_network_base }}31"
 ocp_abi_extra_manifests: "{{ install_extra_manifests | default([]) }}"
-ocp_abi_start_install: "{{ start_install | default(false) }}"
 ocp_abi_path: "{{ lab_path }}/{{ lab_name }}"
 ocp_abi_libvirt_image_dir: "{{ libvirt_image_dir | default('/home/libvirt-ocp') }}"
