@@ -13,8 +13,6 @@ galaxy_info:
         - '8'
   galaxy_tags: []
 dependencies:
-  - name: 'ocp_assisted_service'
-    tags: ['assisted']
   - name: 'ocp_metallb'
     tags: ['metallb']
     vars:
