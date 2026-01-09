@@ -5,10 +5,11 @@
 - name: 'Clean hcp lab'
   hosts:
     - lab
+  vars:
+    lab_name: 'hcp'
   roles:
     - role: 'lab'
       vars:
-        lab_name: 'hcp'
         lab_cleanup: True
   tags:
     - 'clean'
@@ -30,25 +31,29 @@
     lab_name: 'hcp'
     lab_mac_base: 'de:ad:be:ef:03:'
     lab_worker_replicas: 0
-    lab_node_disk_data: 60
-    lab_node_memory: 28000
+    lab_node_disk_data: 150
+    lab_node_memory: 48000
+    lab_node_cpus: 20
     lab_node_network: "{{ lab_node_network_base }}0/24"
-    lab_node_network_base: '192.168.125.'
+    lab_node_network_base: '172.16.252.'
     lab_node_role: 'master'
+    lab_node_cpumode: 'host-passthrough'
+    lab_node_cpuflags: ['vmx']
     libvirt_image_dir: '/home/libvirt-ocp'
     install_extra_manifests: []
     lab_hosts:
       - {'id': '61', 'role': 'master'}
       - {'id': '62', 'role': 'master'}
       - {'id': '63', 'role': 'master'}
-    
+
     # OpenShift installation variables
     ocp_assisted_service_pullsecret: "{{ lab_pull_secret }}"
+    ocp_pullsecret: "{{ lab_pull_secret }}"
     ocp_pullsecret_b64: "{{ lab_pull_secret | b64encode }}"
-    start_install: true
-    
+
     # HCP specific variables
-    lab_configs: "/root/labs/{{ lab_name }}/config"
+    lab_path: '/home/jkary/labs'
+    lab_configs: "/home/jkary/labs/{{ lab_name }}/config"
     lab_network_name: 'lab-network'
     lab_install: true
     lab_node_disk_pool: 'ocp'
@@ -73,48 +78,101 @@
         lb: "{{ lab_node_network_base }}103"
         replicas: 1
 
+    ocp_ssh_key: >
+      ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA0+vLlJwjHXSiQiq9B5B2cVHDPa15behLc9Ly9x0X7Vw6G88A2L3zHLHAwTJ5BL1CknGfHbvRK+6eGqMr6Idvc7f2RLQ6y7MB1q+ECUL1QjUjWue0ZBZkRpRNpwZUPA67X6Yf4wCp9Cg3x4PStiIkEwERBN8pIHfN4PJHYACN9K1co+CryiFPLXMdDYnyEHtbA5JudzEOt5+P1oGjZ5UvGiVu0KoproXOvU3EpJODRMB5cJV5b4cz5aGFjMEYCK+KhtzHGUFbDuJrw62o3j1mbr9C7ZGRT7EWBdDTvi0dKeiapBzq1vyklACkEwNCmDCPz6fki3G7au3vSC1CttyaOw== jkary@dhcp-64-102-214-149.cisco.com
+      ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCbfu0XdmNzwmybuDfO4Xxl/x3ZY0xTuy8dEJfVxHz/wksSU2MSL1TvwCEQymdITmpKaDSmtyY34WajU7i2hdObJJcmAJfErnWRzpj3fbhxRCeEYpBOGAJB2exP7BCW6RohJsLs2oiZb+6qXDBLamVXt+Pvwvo2ROP4/sNIjLAdXHlciDknxyOSaZPHt2X59nFfJYhEv8d3ya9/1CpX5B1yCkrsf9QtmbuP28KGiTCFxAuj1D+uMsffPUSusSjvihLYosZbhzkSNs/qEzcyd0NsEqr5tls8/XSzXwKSg4Dea9ktniZA2vLG6ThkfF05Hs21bb50iwbMfAzwWHTp5zcpoia7VrWL/kGHrjI+f17sTidUR/Ud01zxFo8lZEb2OprDf3sJTiLkzESyDYxB12WqIgKdQZGj7fvHoUmSIrc3NexliMwP812NpBwo6QXGWhSAb2QBt8xXFP9XtBOOKyMHyqjjuPD67fmiE6FGB0uSbtRUzisU+UjsjCnZ+E8vz48= jkary@jkary98-alps
+
   environment:
     PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin'
-    KUBECONFIG: "/root/labs/{{ lab_name }}/deploy/auth/kubeconfig"
+    KUBECONFIG: "/home/jkary/labs/{{ lab_name }}/deploy/auth/kubeconfig"
 
   roles:
     - role: 'lab'
       tags: ['ocp']
     - role: 'ocp_abi'
       tags: ['ocp']
+    - role: 'ocp_lvms'
+      tags: ['postinst']
+    - role: 'ocp_registry'
+      tags: ['postinst']
+    - role: 'ocp_assisted_service'
+      tags: ['postinst', 'assisted']
     - role: 'ocp_hcp'
       tags: ['postinst']
 
 - name: 'Extract spoke cluster configuration'
+  gather_facts: false
   hosts:
     - lab
   environment:
-    KUBECONFIG: "/root/labs/{{ lab_name }}/deploy/auth/kubeconfig"
+    KUBECONFIG: "/home/jkary/labs/{{ lab_name }}/deploy/auth/kubeconfig"
+
+  tasks:
+    - name: 'Enable default catalog sources on spoke cluster'
+      kubernetes.core.k8s:
+        state: patched
+        api_version: hypershift.openshift.io/v1beta1
+        kind: HostedCluster
+        name: 'spoke'
+        namespace: 'spoke'
+        definition:
+          spec:
+            configuration:
+              operatorhub:
+                disableAllDefaultSources: false
+      tags: ['spoke', 'olm']
+
   roles:
     - role: 'ocp_hcp'
       vars:
         lab_name: 'hcp'
-        lab_path: '/root/labs'
+        lab_path: '/home/jkary/labs'
+        lab_node_network_base: '172.16.252.'
         spoke_name: 'spoke'
         ocp_hcp_setup_config: true
         ocp_hcp_setup_ingress: false
+        ocp_hcp_kubeapi_ips: ["{{ lab_node_network_base }}102/32"]
   tags:
     - 'postinst'
     - 'spoke'
 
-- name: 'Setup spoke cluster ingress'
+- name: 'Setup spoke cluster storage and ingress'
   hosts:
     - lab
   environment:
-    KUBECONFIG: "/root/labs/hcp/spoke/auth/kubeconfig"
+    KUBECONFIG: "/home/jkary/labs/hcp/spoke/auth/kubeconfig"
+
+  vars:
+    lab_configs: "/home/jkary/labs/hcp/config"
+
+  tasks:
+    - name: 'Wait for default CatalogSources to be available'
+      kubernetes.core.k8s_info:
+        api_version: 'operators.coreos.com/v1alpha1'
+        kind: 'CatalogSource'
+        namespace: 'openshift-marketplace'
+      register: __spoke_catalogsources
+      until: >
+        __spoke_catalogsources.resources |
+        selectattr('status.connectionState.lastObservedState', 'defined') |
+        selectattr('status.connectionState.lastObservedState', 'equalto', 'READY') |
+        list | length > 0
+      retries: 60
+      delay: 10
+      tags: ['storage', 'olm']
+
   roles:
+    - role: 'ocp_lvms'
+      tags: ['storage']
     - role: 'ocp_hcp'
       vars:
         lab_name: 'hcp'
-        lab_path: '/root/labs'
-        lab_node_network_base: '192.168.125.'
+        lab_path: '/home/jkary/labs'
+        lab_node_network_base: '172.16.252.'
         spoke_name: 'spoke'
         spoke_lb_ips: ["{{ lab_node_network_base }}103/32"]
+        ocp_hcp_kubeapi_ips: ["{{ lab_node_network_base }}102/32"]
+        ocp_hcp_kubeapi_name: 'kubeapi-lb-pool'
         ocp_hcp_setup_config: false
         ocp_hcp_setup_ingress: true
   tags:
