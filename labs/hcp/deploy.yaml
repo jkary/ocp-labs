@@ -132,6 +132,48 @@
         ocp_hcp_setup_config: true
         ocp_hcp_setup_ingress: false
         ocp_hcp_kubeapi_ips: ["{{ lab_node_network_base }}102/32"]
+
+  post_tasks:
+    - name: 'Wait for agents to complete installation'
+      kubernetes.core.k8s_info:
+        api_version: 'agent-install.openshift.io/v1beta1'
+        kind: Agent
+        namespace: hardware-inventory
+      register: __agents
+      until: >
+        __agents.resources | length > 0 and
+        __agents.resources |
+        selectattr('status.debugInfo.state', 'defined') |
+        selectattr('status.debugInfo.state', 'in', ['added-to-existing-cluster', 'installed']) |
+        list | length == __agents.resources | length
+      retries: 60
+      delay: 30
+      tags: ['spoke', 'agents']
+
+    - name: 'Eject ISO from worker VMs after installation'
+      ansible.builtin.command:
+        cmd: "virsh change-media {{ item.metadata.labels['agent-install.openshift.io/bmh'] }} hdc --eject --force"
+      loop: "{{ __agents.resources }}"
+      when:
+        - item.metadata.labels['agent-install.openshift.io/bmh'] is defined
+        - item.status.debugInfo.state in ['added-to-existing-cluster', 'installed']
+      register: __iso_eject
+      failed_when:
+        - __iso_eject.rc != 0
+        - "'no medium found' not in __iso_eject.stderr"
+        - "\"doesn't have media\" not in __iso_eject.stderr"
+      tags: ['spoke', 'agents']
+
+    - name: 'Reboot worker VMs to boot from disk'
+      ansible.builtin.command:
+        cmd: "virsh reboot {{ item.metadata.labels['agent-install.openshift.io/bmh'] }}"
+      loop: "{{ __agents.resources }}"
+      when:
+        - item.metadata.labels['agent-install.openshift.io/bmh'] is defined
+        - item.status.debugInfo.state in ['added-to-existing-cluster', 'installed']
+        - __iso_eject.changed
+      tags: ['spoke', 'agents']
+
   tags:
     - 'postinst'
     - 'spoke'
@@ -146,6 +188,29 @@
     lab_configs: "/home/jkary/labs/hcp/config"
 
   tasks:
+    - name: 'Wait for spoke cluster worker nodes'
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+      register: __spoke_nodes
+      until: __spoke_nodes.resources | length > 0
+      retries: 60
+      delay: 10
+      tags: ['storage', 'nodes']
+
+    - name: 'Clean up failed OLM bundle unpacking jobs'
+      kubernetes.core.k8s:
+        api_version: batch/v1
+        kind: Job
+        namespace: openshift-marketplace
+        name: "{{ item.metadata.name }}"
+        state: absent
+      loop: "{{ __failed_jobs }}"
+      when: __failed_jobs | length > 0
+      vars:
+        __failed_jobs: "{{ lookup('kubernetes.core.k8s', api_version='batch/v1', kind='Job', namespace='openshift-marketplace') | default([], true) }}"
+      tags: ['storage', 'olm']
+
     - name: 'Wait for default CatalogSources to be available'
       kubernetes.core.k8s_info:
         api_version: 'operators.coreos.com/v1alpha1'
